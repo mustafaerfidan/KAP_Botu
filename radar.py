@@ -1,12 +1,14 @@
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 import subprocess
 import sys
 
-KAP_URL = "https://www.kap.org.tr/tr/"
+KAP_ANA_SAYFA = "https://www.kap.org.tr/tr/"
 
 def standart_metne_cevir(metin):
     if not metin:
@@ -18,123 +20,156 @@ def standart_metne_cevir(metin):
         metin = metin.replace(tr, eng)
     return metin
 
-def kap_tam_isabet_avcisi():
+def kap_tab_enter_kesin_bot():
     print("🌐 Chrome başlatılıyor...")
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
     options.add_experimental_option("detach", True) 
+    
+    options.add_argument("--disable-background-timer-throttling")
+    options.add_argument("--disable-backgrounding-occluded-windows")
+    options.add_argument("--disable-renderer-backgrounding")
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
     try:
-        driver.get(KAP_URL)
+        driver.get(KAP_ANA_SAYFA)
         print("\n" + "="*70)
-        print("🚨 SİSTEM HAZIR!")
-        print("1. Filtrelerini ayarla (BİST, ÖDA).")
-        print("2. Listeyi aşağı kaydır (Ekranda ilanlar görünsün).")
+        print("🚨 KONTROL SENDE!")
+        print("1. Filtrelerini ayarla (BİST, ÖDA, 50-100-250 vs.)")
+        print("2. Tablo ekrana geldiğinde terminalde ENTER'a bas.")
         print("="*70 + "\n")
         
-        input("Hazır olduğunda ENTER'a bas! (Fareyle tıklama simülasyonu başlıyor)...\n")
+        input("Hazır olduğunda ENTER tuşuna bas...\n")
         
         eski_idler = set()
         
+        # Tablo satırlarını çeken JS
+        js_veri_cekme_kodu = """
+            let data = {};
+            document.querySelectorAll('a[href*="/tr/Bildirim/"]').forEach(a => {
+                let row = a.closest('tr, [role="row"], div.w-row, div.ng-scope'); 
+                let id = a.href.split('/').pop();
+                if (row && id && id.length > 3) {
+                    let metin = row.innerText;
+                    if (metin && metin.length > 30) {
+                        data[id] = metin;
+                    }
+                }
+            });
+            return data;
+        """
+
+        # SADECE ŞİRKET UNVANI KUTUSUNU YAKALAYAN JS
+        tablo_inputu = driver.execute_script("""
+            let allInputs = Array.from(document.querySelectorAll('input'));
+            
+            // 1. Placeholder'ında 'kod' veya 'unvan' olan gerçek görünen kutuyu yakala
+            let hedef = allInputs.find(inp => {
+                let p = (inp.placeholder || '').toLowerCase();
+                let gorunur = inp.offsetWidth > 40 && inp.offsetHeight > 15;
+                return gorunur && (p.includes('kod') || p.includes('unvan') || p.includes('irket'));
+            });
+
+            // 2. Bulamazsa 50-100-250'nin solundaki görünür kutuyu al
+            if (!hedef) {
+                let gosterim = Array.from(document.querySelectorAll('*')).find(el => {
+                    let t = (el.textContent || '').trim();
+                    return (t === '50' || t === 'Gösterim') && el.getBoundingClientRect().top > 200;
+                });
+                if (gosterim) {
+                    let satir = gosterim.closest('.row, form, div.w-row') || gosterim.parentElement.parentElement;
+                    if (satir) {
+                        hedef = Array.from(satir.querySelectorAll('input')).find(i => i.offsetWidth > 40);
+                    }
+                }
+            }
+
+            return hedef;
+        """)
+
+        if not tablo_inputu:
+            print("❌ Hata: Şirket unvanı kutusu tespit edilemedi!")
+            return
+
+        # 1. Kutuya odaklan ve tıkla (Selenium crash vermesin diye JS ile tetikliyoruz)
+        print("🎯 Şirket unvanı kutusuna tıklandı...")
+        driver.execute_script("""
+            arguments[0].scrollIntoView({block: 'center'});
+            arguments[0].style.outline = '4px solid #00ff00';
+            arguments[0].focus();
+            arguments[0].click();
+        """, tablo_inputu)
+        time.sleep(0.5)
+
+        # 2. Klavyeden TAB tuşuna bas (Bitişiğindeki gri büyütece geçer)
+        print("⌨️ TAB tuşuna basıldı...")
+        ActionChains(driver).send_keys(Keys.TAB).perform()
+        time.sleep(0.5)
+
+        # 3. TAB ile odaklanan büyüteci yeşil yap ve hafızaya al
+        buyutec_butonu = driver.switch_to.active_element
+        driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", buyutec_butonu)
+
+        # 4. İlk ENTER tuşunu bas
+        print("🚀 İlk ENTER basıldı! Tablo tetiklendi...")
+        ActionChains(driver).send_keys(Keys.ENTER).perform()
+        time.sleep(2)
+
+        # Mevcut eski ilanları hafızaya al
+        baslangic_verileri = driver.execute_script(js_veri_cekme_kodu)
+        for bid in baslangic_verileri.keys():
+            eski_idler.add(bid)
+            
+        print(f"\n✅ Başlangıçtaki {len(eski_idler)} adet eski ilan listeye alındı.")
+        print("⏳ Radar devrede. Her 15 saniyede bir ENTER basılacak...\n")
+        
         while True:
-            # 1. YENİ BİLDİRİM BUTONU KONTROLÜ
             try:
-                butonlar = driver.find_elements(By.XPATH, "//*[contains(text(), 'eni bildirim') or contains(text(), 'bildirimler var')]")
-                for btn in butonlar:
-                    if btn.is_displayed():
-                        driver.execute_script("arguments[0].click();", btn)
-                        time.sleep(3) 
-                        break 
-            except:
+                zaman = time.strftime('%H:%M:%S')
+                
+                # Büyütece odaklanıp ENTER bas
+                driver.execute_script("arguments[0].focus();", buyutec_butonu)
+                ActionChains(driver).send_keys(Keys.ENTER).perform()
+
+                print(f"⌨️ [{zaman}] ENTER basıldı, liste tazelendi.")
+                
+                # Tablonun güncellenmesi için 3 saniye pay bırak
+                time.sleep(3)
+                
+                # Yeni verileri çek
+                guncel_veriler = driver.execute_script(js_veri_cekme_kodu)
+                
+                for bildirim_id, orijinal_metin in guncel_veriler.items():
+                    if bildirim_id not in eski_idler:
+                        eski_idler.add(bildirim_id)
+                        
+                        print("-" * 60)
+                        temiz_gosterim = " ".join(orijinal_metin.split())
+                        print(f"👀 YENİ İLAN DÜŞTÜ: {temiz_gosterim[:100]}...")
+                        
+                        metin = standart_metne_cevir(orijinal_metin)
+                        
+                        # Hedef kelime kontrolü
+                        hedef_bulundu = False
+                        if "YENI IS ILISKISI" in metin or "IHALE" in metin or "OZEL DURUM ACIKLAMASI" in metin or "SOZLESME" in metin or "SIPARIS" in metin:
+                            hedef_bulundu = True
+
+                        if hedef_bulundu:
+                            print("\n" + "🎯"*10)
+                            print(f"✅ HEDEF KELİME BULUNDU!")
+                            print(f"🚀 KAP Kazıyıcı ({bildirim_id}) tetikleniyor...")
+                            
+                            subprocess.Popen([sys.executable, "kap_kaziyici.py", bildirim_id])
+                            print("🎯"*10 + "\n")
+                            
+            except Exception as e:
                 pass
-
-            # 2. TABLODAKİ TÜM LİNKLERİ ÇEK
-            link_elementleri = driver.find_elements(By.XPATH, "//a[contains(@href, '/tr/Bildirim/')]")
             
-            anlik_ilanlar = {} # Aynı ilanın tüm sütunlarını burada birleştireceğiz
-            
-            for link in link_elementleri:
-                try:
-                    # Sitenin en tepesindeki (Y<200) kayan reklam bandını tamamen yoksay (EBEBEK belası burada çözüldü)
-                    if link.location['y'] < 200:
-                        continue
-                        
-                    url = link.get_attribute("href")
-                    bid = url.split("/")[-1]
-                    if not bid: continue
-                    
-                    # Sadece o hücrenin metnini al
-                    ham_metin = link.get_attribute("textContent").strip()
-                    
-                    # Aynı ID'ye sahip yazıları yan yana ekle (TKNSA + Yeni İş İlişkisi + Özet...)
-                    if bid not in anlik_ilanlar:
-                        anlik_ilanlar[bid] = {
-                            'element': link, # Tıklamak için bir tane linki elimizde tutuyoruz
-                            'metin': ham_metin
-                        }
-                    else:
-                        anlik_ilanlar[bid]['metin'] += " | " + ham_metin
-                        
-                except:
-                    continue
-                    
-            # 3. ŞİMDİ TOPLADIĞIMIZ İLANLARI DEĞERLENDİRELİM
-            for bid, veri in anlik_ilanlar.items():
-                if bid not in eski_idler:
-                    eski_idler.add(bid) # Artık bu ilanın TÜM satırını okuduk, eskilere atabiliriz
-                    
-                    orijinal_metin = veri['metin']
-                    
-                    # Eğer satırda hiç yazı yoksa pas geç
-                    if len(orijinal_metin) < 5:
-                        continue
-
-                    # Kırmızı kutuyu çiz (Nereye baktığını gör)
-                    hedef_link = veri['element']
-                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", hedef_link)
-                    driver.execute_script("arguments[0].style.border='3px solid red'", hedef_link)
-                    time.sleep(0.3)
-                    
-                    print(f"👀 İlan Okundu: {orijinal_metin[:120]}...")
-                    driver.execute_script("arguments[0].style.border=''", hedef_link)
-                    
-                    metin = standart_metne_cevir(orijinal_metin)
-                    
-                    # --- HEDEF KONTROLÜ (Senin 3 Altın Kuralın) ---
-                    hedef_bulundu = False
-                    if "YENI IS ILISKISI" in metin or "IHALE" in metin or "OZEL DURUM ACIKLAMASI" in metin or "SOZLESME" in metin or "SIPARIS" in metin:
-                        hedef_bulundu = True
-
-                    if hedef_bulundu:
-                        print("\n" + "*"*60)
-                        print(f"🎯 HEDEF BULUNDU! Yeni sekmede açılıyor...")
-                        
-                        # 4. YENİ SEKMEDE AÇ VE ADRESİ KOPYALA
-                        driver.execute_script("window.open(arguments[0].href, '_blank');", hedef_link)
-                        time.sleep(2)
-                        
-                        driver.switch_to.window(driver.window_handles[-1])
-                        adres_cubugu_url = driver.current_url
-                        final_id = adres_cubugu_url.split("/")[-1]
-                        
-                        print(f"🔗 URL Alındı: {adres_cubugu_url}")
-                        print(f"🚀 KAP Kazıyıcı ({final_id}) tetikleniyor...")
-                        
-                        # 5. KAZIYICIYI ÇALIŞTIR
-                        subprocess.Popen([sys.executable, "kap_kaziyici.py", final_id])
-                        
-                        # Sekmeyi kapat ve ana listeye dön
-                        driver.close()
-                        driver.switch_to.window(driver.window_handles[0])
-                        
-                        print("*"*60 + "\n")
-                        time.sleep(1)
-            
-            time.sleep(15)
+            # 12 saniye bekleme (toplam 15 saniye)
+            time.sleep(12)
 
     except Exception as e:
         print(f"❌ HATA: {e}")
 
-kap_tam_isabet_avcisi()
+kap_tab_enter_kesin_bot()
