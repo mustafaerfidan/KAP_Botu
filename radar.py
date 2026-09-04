@@ -8,11 +8,14 @@ import time
 
 KAP_ANA_SAYFA = "https://www.kap.org.tr/tr/"
 
-def kap_saf_piksel_modu():
-    print("🌐 Chrome başlatılıyor (ESKİ USUL PİKSEL MODU)...")
+def kap_saf_piksel_modu_hizli():
+    print("🌐 Chrome başlatılıyor (GÖRSELLERİ BEKLEMEYEN JET MOD)...")
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
     options.add_experimental_option("detach", True) 
+    
+    # 🔥 YENİ: Sitenin resimlerini ve CSS tasarımını beklemeyi kapatır, sadece linke odaklanır!
+    options.page_load_strategy = 'eager'
     
     options.add_argument("--disable-background-timer-throttling")
     options.add_argument("--disable-backgrounding-occluded-windows")
@@ -35,7 +38,7 @@ def kap_saf_piksel_modu():
             return elements.find(e => e.innerText.trim() === 'Tarih');
         """
         
-        print("✅ Sistem hazır! Tarih referans alınıp piksellerle aşağı inilecek.")
+        print("✅ Sistem hazır! Toplam döngü yaklaşık 25 saniye sürecek şekilde ayarlandı.")
         
         while True:
             try:
@@ -59,10 +62,10 @@ def kap_saf_piksel_modu():
                     driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", guncel_buyutec)
                     
                     ActionChains(driver).send_keys(Keys.ENTER).perform()
-                    print(f"🔄 [{zaman}] Büyütece basıldı.")
+                    print(f"\n🔄 [{zaman}] Büyütece basıldı.")
                 
-                print("⏳ Sayfanın tam oturması için 6 saniye bekleniyor...")
-                time.sleep(3) 
+                print("⏳ Sayfanın tam oturması için 4 saniye bekleniyor...")
+                time.sleep(4) 
                 
                 # 2. Tarih yazısını bul
                 tarih_element = driver.execute_script(js_tarih_bul)
@@ -72,11 +75,9 @@ def kap_saf_piksel_modu():
                     print(f"🎯 Tarih referansı bulundu. Tıklamalar başlıyor...")
                     
                     # 🔥 BURADAKİ SAYILARI KAFANA GÖRE DEĞİŞTİR 🔥
-                    # 1. İlan, 2. İlan ve 3. İlan için inilecek pikseller
                     PIKSELLER = [50, 120, 190] 
                     
                     for i, piksel in enumerate(PIKSELLER, 1):
-                        # Fareyi BAŞTAN "Tarih" yazısına koyup piksel kadar in
                         ActionChains(driver) \
                             .move_to_element(tarih_element) \
                             .move_by_offset(0, piksel) \
@@ -85,21 +86,21 @@ def kap_saf_piksel_modu():
                             .key_up(Keys.CONTROL) \
                             .perform()
                         
-                        time.sleep(1) # Sekme geçiş payı
+                        time.sleep(1) # Sekmenin açılması için ufak bir pay
                         
                         # Yeni sekmeye geç
                         driver.switch_to.window(driver.window_handles[-1])
                         
-                        print(f"⏳ {i}. İlan açıldı (İnilen Piksel: {piksel}), sayfanın yüklenmesi için 5 saniye bekleniyor...")
-                        time.sleep(3) 
+                        # 🔥 BEKLEMEYİ SİLDİK! URL adres çubuğuna düşsün diye sadece yarım saniye bekliyor
+                        time.sleep(0.5) 
                         
-                        print(f"✅ Okundu: {driver.current_url}")
+                        print(f"✅ {i}. İlan Linki Alındı: {driver.current_url}")
                         
                         # Kapat ve ana tabloya dön
                         driver.close()
                         driver.switch_to.window(driver.window_handles[0])
                         
-                        time.sleep(1) # Nefes alma payı
+                        time.sleep(1) # Diğer ilana tıklamadan önce ufak nefes payı
                         
                     print("-" * 50)
                 else:
@@ -108,10 +109,11 @@ def kap_saf_piksel_modu():
             except Exception as e:
                 print(f"⚠️ DÖNGÜ HATASI: {e}")
             
-            print("⏳ Bir sonraki yenileme için 25 saniye bekleniyor...")
-            time.sleep(20) 
+            # İşlemler çok hızlandığı için (toplam ~9 sn sürüyor), 25 saniye döngüsünü tutturmak adına 16 saniye bekliyoruz
+            print("⏳ Döngü tamamlandı. Sonraki yenilemeye kadar 16 saniye dinleniliyor...")
+            time.sleep(10) 
 
     except Exception as e:
         print(f"❌ SİSTEM HATASI: {e}")
 
-kap_saf_piksel_modu()
+kap_saf_piksel_modu_hizli()
