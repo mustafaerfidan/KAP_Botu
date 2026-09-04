@@ -6,15 +6,16 @@ from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 
+# YENİ YAZDIĞIMIZ SÜZGEÇ MODÜLÜNÜ İÇERİ AKTARIYORUZ
+from suzgec import KapSuzgeci 
+
 KAP_ANA_SAYFA = "https://www.kap.org.tr/tr/"
 
 def kap_saf_piksel_modu_hizli():
-    print("🌐 Chrome başlatılıyor (GÖRSELLERİ BEKLEMEYEN JET MOD)...")
+    print("🌐 Chrome başlatılıyor (SÜZGEÇ ENTEGRELİ MOD)...")
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
     options.add_experimental_option("detach", True) 
-    
-    # 🔥 YENİ: Sitenin resimlerini ve CSS tasarımını beklemeyi kapatır, sadece linke odaklanır!
     options.page_load_strategy = 'eager'
     
     options.add_argument("--disable-background-timer-throttling")
@@ -22,6 +23,9 @@ def kap_saf_piksel_modu_hizli():
     options.add_argument("--disable-renderer-backgrounding")
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    
+    # SÜZGECİMİZİ (GÜMRÜK MEMURUNU) GÖREVE BAŞLATIYORUZ
+    suzgec = KapSuzgeci()
     
     try:
         driver.get(KAP_ANA_SAYFA)
@@ -38,13 +42,12 @@ def kap_saf_piksel_modu_hizli():
             return elements.find(e => e.innerText.trim() === 'Tarih');
         """
         
-        print("✅ Sistem hazır! Toplam döngü yaklaşık 25 saniye sürecek şekilde ayarlandı.")
+        print("✅ Sistem hazır! Linkler okunup süzgece gönderilecek.")
         
         while True:
             try:
                 zaman = time.strftime('%H:%M:%S')
                 
-                # 1. Büyüteci bul ve yenile
                 guncel_input = driver.execute_script("""
                     let allInputs = Array.from(document.querySelectorAll('input'));
                     return allInputs.find(inp => {
@@ -67,15 +70,12 @@ def kap_saf_piksel_modu_hizli():
                 print("⏳ Sayfanın tam oturması için 4 saniye bekleniyor...")
                 time.sleep(4) 
                 
-                # 2. Tarih yazısını bul
                 tarih_element = driver.execute_script(js_tarih_bul)
                 
                 if tarih_element:
                     driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", tarih_element)
-                    print(f"🎯 Tarih referansı bulundu. Tıklamalar başlıyor...")
                     
-                    # 🔥 BURADAKİ SAYILARI KAFANA GÖRE DEĞİŞTİR 🔥
-                    PIKSELLER = [50, 120, 190] 
+                    PIKSELLER = [50, 120, 180] 
                     
                     for i, piksel in enumerate(PIKSELLER, 1):
                         ActionChains(driver) \
@@ -86,31 +86,34 @@ def kap_saf_piksel_modu_hizli():
                             .key_up(Keys.CONTROL) \
                             .perform()
                         
-                        time.sleep(1) # Sekmenin açılması için ufak bir pay
+                        time.sleep(1) 
                         
-                        # Yeni sekmeye geç
                         driver.switch_to.window(driver.window_handles[-1])
+                        time.sleep(1) 
                         
-                        # 🔥 BEKLEMEYİ SİLDİK! URL adres çubuğuna düşsün diye sadece yarım saniye bekliyor
-                        time.sleep(0.5) 
+                        okunan_link = driver.current_url
                         
-                        print(f"✅ {i}. İlan Linki Alındı: {driver.current_url}")
+                        # --- YENİ SÜZGEÇ MANTIĞI BURADA DEVREYE GİRİYOR ---
+                        if suzgec.link_ekle(okunan_link):
+                            print(f"🌟 YENİ İLAN SÜZGEÇTEN GEÇTİ VE KUYRUĞA ALINDI: {okunan_link}")
+                        else:
+                            # Terminali çok kirletmesin diye eski linkleri gri gibi sönük yazdırabiliriz veya direkt pass geçebiliriz
+                            print(f"➖ Eski ilan atlandı: {okunan_link.split('/')[-1]}")
                         
-                        # Kapat ve ana tabloya dön
                         driver.close()
                         driver.switch_to.window(driver.window_handles[0])
-                        
-                        time.sleep(1) # Diğer ilana tıklamadan önce ufak nefes payı
+                        time.sleep(1) 
                         
                     print("-" * 50)
+                    print(f"📦 KUYRUKTAKİ BEKLEYEN İLAN SAYISI: {suzgec.kuyruk_durumu()}")
+                    print("-" * 50)
+                    
                 else:
                     print("⚠️ Ekranda 'Tarih' referansı bulunamadı!")
                             
             except Exception as e:
                 print(f"⚠️ DÖNGÜ HATASI: {e}")
             
-            # İşlemler çok hızlandığı için (toplam ~9 sn sürüyor), 25 saniye döngüsünü tutturmak adına 16 saniye bekliyoruz
-            print("⏳ Döngü tamamlandı. Sonraki yenilemeye kadar 16 saniye dinleniliyor...")
             time.sleep(10) 
 
     except Exception as e:
