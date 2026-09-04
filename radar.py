@@ -5,23 +5,11 @@ from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 import time
-import subprocess
-import sys
 
 KAP_ANA_SAYFA = "https://www.kap.org.tr/tr/"
 
-def standart_metne_cevir(metin):
-    if not metin:
-        return ""
-    metin = metin.replace("İ", "I").replace("i", "I").replace("ı", "I")
-    metin = metin.upper()
-    harfler = {"Ş": "S", "Ç": "C", "Ğ": "G", "Ü": "U", "Ö": "O"}
-    for tr, eng in harfler.items():
-        metin = metin.replace(tr, eng)
-    return metin
-
-def kap_tab_enter_kesin_bot():
-    print("🌐 Chrome başlatılıyor...")
+def kap_saf_piksel_modu():
+    print("🌐 Chrome başlatılıyor (ESKİ USUL PİKSEL MODU)...")
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
     options.add_experimental_option("detach", True) 
@@ -36,140 +24,94 @@ def kap_tab_enter_kesin_bot():
         driver.get(KAP_ANA_SAYFA)
         print("\n" + "="*70)
         print("🚨 KONTROL SENDE!")
-        print("1. Filtrelerini ayarla (BİST, ÖDA, 50-100-250 vs.)")
+        print("1. Filtrelerini ayarla (BİST, ÖDA vs.)")
         print("2. Tablo ekrana geldiğinde terminalde ENTER'a bas.")
         print("="*70 + "\n")
         
         input("Hazır olduğunda ENTER tuşuna bas...\n")
         
-        eski_idler = set()
-        
-        # Tablo satırlarını çeken JS
-        js_veri_cekme_kodu = """
-            let data = {};
-            document.querySelectorAll('a[href*="/tr/Bildirim/"]').forEach(a => {
-                let row = a.closest('tr, [role="row"], div.w-row, div.ng-scope'); 
-                let id = a.href.split('/').pop();
-                if (row && id && id.length > 3) {
-                    let metin = row.innerText;
-                    if (metin && metin.length > 30) {
-                        data[id] = metin;
-                    }
-                }
-            });
-            return data;
+        js_tarih_bul = """
+            let elements = Array.from(document.querySelectorAll('div, th, span'));
+            return elements.find(e => e.innerText.trim() === 'Tarih');
         """
-
-        # SADECE ŞİRKET UNVANI KUTUSUNU YAKALAYAN JS
-        tablo_inputu = driver.execute_script("""
-            let allInputs = Array.from(document.querySelectorAll('input'));
-            
-            // 1. Placeholder'ında 'kod' veya 'unvan' olan gerçek görünen kutuyu yakala
-            let hedef = allInputs.find(inp => {
-                let p = (inp.placeholder || '').toLowerCase();
-                let gorunur = inp.offsetWidth > 40 && inp.offsetHeight > 15;
-                return gorunur && (p.includes('kod') || p.includes('unvan') || p.includes('irket'));
-            });
-
-            // 2. Bulamazsa 50-100-250'nin solundaki görünür kutuyu al
-            if (!hedef) {
-                let gosterim = Array.from(document.querySelectorAll('*')).find(el => {
-                    let t = (el.textContent || '').trim();
-                    return (t === '50' || t === 'Gösterim') && el.getBoundingClientRect().top > 200;
-                });
-                if (gosterim) {
-                    let satir = gosterim.closest('.row, form, div.w-row') || gosterim.parentElement.parentElement;
-                    if (satir) {
-                        hedef = Array.from(satir.querySelectorAll('input')).find(i => i.offsetWidth > 40);
-                    }
-                }
-            }
-
-            return hedef;
-        """)
-
-        if not tablo_inputu:
-            print("❌ Hata: Şirket unvanı kutusu tespit edilemedi!")
-            return
-
-        # 1. Kutuya odaklan ve tıkla (Selenium crash vermesin diye JS ile tetikliyoruz)
-        print("🎯 Şirket unvanı kutusuna tıklandı...")
-        driver.execute_script("""
-            arguments[0].scrollIntoView({block: 'center'});
-            arguments[0].style.outline = '4px solid #00ff00';
-            arguments[0].focus();
-            arguments[0].click();
-        """, tablo_inputu)
-        time.sleep(0.5)
-
-        # 2. Klavyeden TAB tuşuna bas (Bitişiğindeki gri büyütece geçer)
-        print("⌨️ TAB tuşuna basıldı...")
-        ActionChains(driver).send_keys(Keys.TAB).perform()
-        time.sleep(0.5)
-
-        # 3. TAB ile odaklanan büyüteci yeşil yap ve hafızaya al
-        buyutec_butonu = driver.switch_to.active_element
-        driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", buyutec_butonu)
-
-        # 4. İlk ENTER tuşunu bas
-        print("🚀 İlk ENTER basıldı! Tablo tetiklendi...")
-        ActionChains(driver).send_keys(Keys.ENTER).perform()
-        time.sleep(2)
-
-        # Mevcut eski ilanları hafızaya al
-        baslangic_verileri = driver.execute_script(js_veri_cekme_kodu)
-        for bid in baslangic_verileri.keys():
-            eski_idler.add(bid)
-            
-        print(f"\n✅ Başlangıçtaki {len(eski_idler)} adet eski ilan listeye alındı.")
-        print("⏳ Radar devrede. Her 15 saniyede bir ENTER basılacak...\n")
+        
+        print("✅ Sistem hazır! Tarih referans alınıp piksellerle aşağı inilecek.")
         
         while True:
             try:
                 zaman = time.strftime('%H:%M:%S')
                 
-                # Büyütece odaklanıp ENTER bas
-                driver.execute_script("arguments[0].focus();", buyutec_butonu)
-                ActionChains(driver).send_keys(Keys.ENTER).perform()
+                # 1. Büyüteci bul ve yenile
+                guncel_input = driver.execute_script("""
+                    let allInputs = Array.from(document.querySelectorAll('input'));
+                    return allInputs.find(inp => {
+                        let p = (inp.placeholder || '').toLowerCase();
+                        return inp.offsetWidth > 40 && (p.includes('kod') || p.includes('unvan') || p.includes('irket'));
+                    });
+                """)
 
-                print(f"⌨️ [{zaman}] ENTER basıldı, liste tazelendi.")
+                if guncel_input:
+                    driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].focus(); arguments[0].click();", guncel_input)
+                    time.sleep(0.2)
+                    ActionChains(driver).send_keys(Keys.TAB).perform()
+                    time.sleep(0.2)
+                    guncel_buyutec = driver.switch_to.active_element
+                    driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", guncel_buyutec)
+                    
+                    ActionChains(driver).send_keys(Keys.ENTER).perform()
+                    print(f"🔄 [{zaman}] Büyütece basıldı.")
                 
-                # Tablonun güncellenmesi için 3 saniye pay bırak
-                time.sleep(3)
+                print("⏳ Sayfanın tam oturması için 6 saniye bekleniyor...")
+                time.sleep(3) 
                 
-                # Yeni verileri çek
-                guncel_veriler = driver.execute_script(js_veri_cekme_kodu)
+                # 2. Tarih yazısını bul
+                tarih_element = driver.execute_script(js_tarih_bul)
                 
-                for bildirim_id, orijinal_metin in guncel_veriler.items():
-                    if bildirim_id not in eski_idler:
-                        eski_idler.add(bildirim_id)
+                if tarih_element:
+                    driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", tarih_element)
+                    print(f"🎯 Tarih referansı bulundu. Tıklamalar başlıyor...")
+                    
+                    # 🔥 BURADAKİ SAYILARI KAFANA GÖRE DEĞİŞTİR 🔥
+                    # 1. İlan, 2. İlan ve 3. İlan için inilecek pikseller
+                    PIKSELLER = [50, 120, 190] 
+                    
+                    for i, piksel in enumerate(PIKSELLER, 1):
+                        # Fareyi BAŞTAN "Tarih" yazısına koyup piksel kadar in
+                        ActionChains(driver) \
+                            .move_to_element(tarih_element) \
+                            .move_by_offset(0, piksel) \
+                            .key_down(Keys.CONTROL) \
+                            .click() \
+                            .key_up(Keys.CONTROL) \
+                            .perform()
                         
-                        print("-" * 60)
-                        temiz_gosterim = " ".join(orijinal_metin.split())
-                        print(f"👀 YENİ İLAN DÜŞTÜ: {temiz_gosterim[:100]}...")
+                        time.sleep(1) # Sekme geçiş payı
                         
-                        metin = standart_metne_cevir(orijinal_metin)
+                        # Yeni sekmeye geç
+                        driver.switch_to.window(driver.window_handles[-1])
                         
-                        # Hedef kelime kontrolü
-                        hedef_bulundu = False
-                        if "YENI IS ILISKISI" in metin or "IHALE" in metin or "OZEL DURUM ACIKLAMASI" in metin or "SOZLESME" in metin or "SIPARIS" in metin:
-                            hedef_bulundu = True
-
-                        if hedef_bulundu:
-                            print("\n" + "🎯"*10)
-                            print(f"✅ HEDEF KELİME BULUNDU!")
-                            print(f"🚀 KAP Kazıyıcı ({bildirim_id}) tetikleniyor...")
-                            
-                            subprocess.Popen([sys.executable, "kap_kaziyici.py", bildirim_id])
-                            print("🎯"*10 + "\n")
+                        print(f"⏳ {i}. İlan açıldı (İnilen Piksel: {piksel}), sayfanın yüklenmesi için 5 saniye bekleniyor...")
+                        time.sleep(3) 
+                        
+                        print(f"✅ Okundu: {driver.current_url}")
+                        
+                        # Kapat ve ana tabloya dön
+                        driver.close()
+                        driver.switch_to.window(driver.window_handles[0])
+                        
+                        time.sleep(1) # Nefes alma payı
+                        
+                    print("-" * 50)
+                else:
+                    print("⚠️ Ekranda 'Tarih' referansı bulunamadı!")
                             
             except Exception as e:
-                pass
+                print(f"⚠️ DÖNGÜ HATASI: {e}")
             
-            # 12 saniye bekleme (toplam 15 saniye)
-            time.sleep(12)
+            print("⏳ Bir sonraki yenileme için 25 saniye bekleniyor...")
+            time.sleep(20) 
 
     except Exception as e:
-        print(f"❌ HATA: {e}")
+        print(f"❌ SİSTEM HATASI: {e}")
 
-kap_tab_enter_kesin_bot()
+kap_saf_piksel_modu()
