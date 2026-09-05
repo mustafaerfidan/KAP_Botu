@@ -6,13 +6,12 @@ from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 
-# YENİ YAZDIĞIMIZ SÜZGEÇ MODÜLÜNÜ İÇERİ AKTARIYORUZ
 from suzgec import KapSuzgeci 
 
 KAP_ANA_SAYFA = "https://www.kap.org.tr/tr/"
 
-def kap_saf_piksel_modu_hizli():
-    print("🌐 Chrome başlatılıyor (SÜZGEÇ ENTEGRELİ MOD)...")
+def kap_radar_avci_modu():
+    print("🌐 Chrome başlatılıyor (RADAR BAŞMÜHENDİS MODU)...")
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
     options.add_experimental_option("detach", True) 
@@ -24,7 +23,6 @@ def kap_saf_piksel_modu_hizli():
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
-    # SÜZGECİMİZİ (GÜMRÜK MEMURUNU) GÖREVE BAŞLATIYORUZ
     suzgec = KapSuzgeci()
     
     try:
@@ -42,7 +40,7 @@ def kap_saf_piksel_modu_hizli():
             return elements.find(e => e.innerText.trim() === 'Tarih');
         """
         
-        print("✅ Sistem hazır! Linkler okunup süzgece gönderilecek.")
+        print("✅ Radar aktif! Linkleri bulacak ve boş vaktinde Süzgeç'i çalıştıracak.")
         
         while True:
             try:
@@ -65,9 +63,8 @@ def kap_saf_piksel_modu_hizli():
                     driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", guncel_buyutec)
                     
                     ActionChains(driver).send_keys(Keys.ENTER).perform()
-                    print(f"\n🔄 [{zaman}] Büyütece basıldı.")
+                    print(f"\n🔄 [{zaman}] Büyütece basıldı. Radar tarıyor...")
                 
-                print("⏳ Sayfanın tam oturması için 4 saniye bekleniyor...")
                 time.sleep(4) 
                 
                 tarih_element = driver.execute_script(js_tarih_bul)
@@ -75,7 +72,7 @@ def kap_saf_piksel_modu_hizli():
                 if tarih_element:
                     driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", tarih_element)
                     
-                    PIKSELLER = [50, 120, 180] 
+                    PIKSELLER = [50, 120, 190] 
                     
                     for i, piksel in enumerate(PIKSELLER, 1):
                         ActionChains(driver) \
@@ -86,37 +83,42 @@ def kap_saf_piksel_modu_hizli():
                             .key_up(Keys.CONTROL) \
                             .perform()
                         
-                        time.sleep(1) 
-                        
+                        time.sleep(0.5) 
                         driver.switch_to.window(driver.window_handles[-1])
-                        time.sleep(1) 
+                        time.sleep(0.5) 
                         
                         okunan_link = driver.current_url
                         
-                        # --- YENİ SÜZGEÇ MANTIĞI BURADA DEVREYE GİRİYOR ---
-                        if suzgec.link_ekle(okunan_link):
-                            print(f"🌟 YENİ İLAN SÜZGEÇTEN GEÇTİ VE KUYRUĞA ALINDI: {okunan_link}")
-                        else:
-                            # Terminali çok kirletmesin diye eski linkleri gri gibi sönük yazdırabiliriz veya direkt pass geçebiliriz
-                            print(f"➖ Eski ilan atlandı: {okunan_link.split('/')[-1]}")
+                        # 🔥 1. KORUMA: Sadece geçerli KAP bildirimlerini al (çöp linkleri kuyruğa sokma)
+                        if "Bildirim" in okunan_link:
+                            if suzgec.link_ekle(okunan_link):
+                                print(f"🌟 YENİ İLAN SÜZGEÇTEN GEÇTİ VE KUYRUĞA ALINDI: {okunan_link.split('/')[-1]}")
+                            else:
+                                print(f"➖ Eski ilan atlandı: {okunan_link.split('/')[-1]}")
                         
-                        driver.close()
-                        driver.switch_to.window(driver.window_handles[0])
-                        time.sleep(1) 
+                        # 🔥 2. KORUMA: Ana sekmeyi yanlışlıkla kapatmayı engelle!
+                        if len(driver.window_handles) > 1:
+                            # Birden fazla sekme varsa rahatça kapat ve ana sekmeye dön
+                            driver.close()
+                            driver.switch_to.window(driver.window_handles[0])
+                        elif "Bildirim" in okunan_link:
+                            # Eğer yeni sekme açılamamış ve ilan aynı ekranda açılmışsa filtreler bozulmasın diye geri git
+                            driver.back()
                         
-                    print("-" * 50)
+                        time.sleep(0.5) 
+                        
                     print(f"📦 KUYRUKTAKİ BEKLEYEN İLAN SAYISI: {suzgec.kuyruk_durumu()}")
                     print("-" * 50)
-                    
                 else:
                     print("⚠️ Ekranda 'Tarih' referansı bulunamadı!")
                             
             except Exception as e:
                 print(f"⚠️ DÖNGÜ HATASI: {e}")
             
-            time.sleep(10) 
+            # Süzgece çalışması için süre tanıyoruz
+            suzgec.kuyrugu_isle(driver=driver, sure_limiti=16)
 
     except Exception as e:
         print(f"❌ SİSTEM HATASI: {e}")
 
-kap_saf_piksel_modu_hizli()
+kap_radar_avci_modu()
