@@ -6,61 +6,49 @@ from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 
-# MODÜLLERİMİZİ İÇERİ AKTARIYORUZ
 from suzgec import KapSuzgeci 
 from filtre import KapFiltreci
 
 KAP_ANA_SAYFA = "https://www.kap.org.tr/tr/"
 
 def kap_radar_avci_modu():
-    print("🌐 Chrome başlatılıyor (TAM OTOMATİK RADAR MODU)...")
-    options = webdriver.ChromeOptions()
-    options.add_argument("--start-maximized")
-    options.add_experimental_option("detach", True) 
-    options.page_load_strategy = 'eager'
+    print("🛡️ ZIRHLI VE TURBO RADAR SİSTEMİ BAŞLATILIYOR (Hafifletilmiş Dedektör)...")
     
-    options.add_argument("--disable-background-timer-throttling")
-    options.add_argument("--disable-backgrounding-occluded-windows")
-    options.add_argument("--disable-renderer-backgrounding")
-
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    
-    # Yardımcılarımızı başlatıyoruz
-    suzgec = KapSuzgeci()   # Süzgecin hafızası burada başlar ve asla silinmez!
+    suzgec = KapSuzgeci()   
     filtreci = KapFiltreci()
     
-    tur_sayaci = 0 
+    genel_tur_sayaci = 0 
     
-    try:
-        driver.get(KAP_ANA_SAYFA)
+    while True:
+        print("\n🌐 Yeni ve taptaze bir Chrome açılıyor...")
         
-        # SİSTEM İLK AÇILDIĞINDA FİLTREYİ KUR
-        filtreci.filtreleri_kur(driver)
-        
-        js_tarih_bul = """
-            let elements = Array.from(document.querySelectorAll('div, th, span'));
-            return elements.find(e => e.innerText.trim() === 'Tarih');
-        """
-        
-        print("🚀 Radar aktif! Ava çıkılıyor...")
-        
-        while True:
-            try:
-                tur_sayaci += 1
-                
-                # 🔥 ANTİ-DONMA KORUMASI: 15 Turda bir sayfayı yenile ve filtreyi baştan kur
-                if tur_sayaci >= 15:
-                    print("\n🧹 KAP SİTESİ ŞİŞMESİN DİYE HAFIZA TEMİZLENİYOR (F5)...")
-                    driver.refresh()
-                    time.sleep(5) 
-                    print("🔄 Sayfa yenilendi, filtreler silindi.")
-                    
-                    # Filtreciye haber ver, filtreleri tekrar kursun
-                    filtreci.filtreleri_kur(driver)
-                    
-                    tur_sayaci = 0
-                    continue 
-                
+        options = webdriver.ChromeOptions()
+        options.add_argument("--start-maximized")
+        options.add_experimental_option("detach", True) 
+        options.page_load_strategy = 'eager'
+        options.add_argument("--disable-background-timer-throttling")
+        options.add_argument("--disable-backgrounding-occluded-windows")
+        options.add_argument("--disable-renderer-backgrounding")
+
+        try:
+            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+            driver.set_page_load_timeout(45) 
+            
+            driver.get(KAP_ANA_SAYFA)
+            
+            filtreci.filtreleri_kur(driver)
+            
+            js_tarih_bul = """
+                let elements = Array.from(document.querySelectorAll('div, th, span'));
+                return elements.find(e => e.innerText.trim() === 'Tarih');
+            """
+            
+            print("🚀 Radar aktif! Turbo modda ava çıkılıyor...")
+            
+            ic_tur_sayaci = 0
+            while ic_tur_sayaci < 5:
+                ic_tur_sayaci += 1
+                genel_tur_sayaci += 1
                 zaman = time.strftime('%H:%M:%S')
                 
                 guncel_input = driver.execute_script("""
@@ -80,16 +68,47 @@ def kap_radar_avci_modu():
                     driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", guncel_buyutec)
                     
                     ActionChains(driver).send_keys(Keys.ENTER).perform()
-                    print(f"\n🔄 [{zaman}] Büyütece basıldı. Radar tarıyor... (Tur: {tur_sayaci}/15)")
+                    print(f"\n🔄 [{zaman}] Büyütece basıldı. Radar tarıyor... (5'lik Tur: {ic_tur_sayaci}/5 | Genel Tur: {genel_tur_sayaci})")
+                else:
+                    raise Exception("Arama butonu (Input) bulunamadı! Sayfa eksik yüklenmiş.")
                 
-                time.sleep(5) 
+                # ==============================================================================
+                # 🔥 YENİ SİSTEM: HAFİFLETİLMİŞ AKILLI SPINNER DEDEKTÖRÜ (CHROME'U PATLATMAZ)
+                # ==============================================================================
+                time.sleep(1.5) 
+                
+                bekleme_sayaci = 0
+                while bekleme_sayaci < 12: 
+                    spinner_var_mi = driver.execute_script("""
+                        // Bütün DOM'u taramak yerine sadece class isminde loading/spinner geçenleri bul (ÇOK HIZLI)
+                        let spinners = document.querySelectorAll('[class*="loading" i], [class*="spinner" i], [class*="blockui" i]');
+                        for(let i=0; i<spinners.length; i++) {
+                            let style = window.getComputedStyle(spinners[i]);
+                            if(style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                                return true;
+                            }
+                        }
+                        return false;
+                    """)
+                    
+                    if not spinner_var_mi:
+                        break 
+                        
+                    time.sleep(1)
+                    bekleme_sayaci += 1
+                    
+                if bekleme_sayaci >= 12:
+                    raise Exception("Sonsuz dönen ikon tespit edildi! KAP Tablosu askıda kaldı.")
+                
+                time.sleep(1.5) 
+                # ==============================================================================
                 
                 tarih_element = driver.execute_script(js_tarih_bul)
                 
                 if tarih_element:
                     driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", tarih_element)
                     
-                    PIKSELLER = [50, 120, 190] 
+                    PIKSELLER = [50, 120, 180] 
                     
                     for i, piksel in enumerate(PIKSELLER, 1):
                         ActionChains(driver) \
@@ -107,7 +126,6 @@ def kap_radar_avci_modu():
                         okunan_link = driver.current_url
                         
                         if "Bildirim" in okunan_link:
-                            # 🔥 SÜZGEÇ DEVREDE: Aynı link daha önce okunduysa 'False' döner ve reddedilir
                             if suzgec.link_ekle(okunan_link):
                                 print(f"🌟 YENİ İLAN KUYRUĞA ALINDI: {okunan_link.split('/')[-1]}")
                             else:
@@ -121,19 +139,36 @@ def kap_radar_avci_modu():
                         
                         time.sleep(0.5) 
                         
-                    print(f"📦 KUYRUKTAKİ BEKLEYEN İLAN SAYISI: {suzgec.kuyruk_durumu()}")
+                    bekleyen_sayisi = suzgec.kuyruk_durumu()
+                    print(f"📦 KUYRUKTAKİ BEKLEYEN İLAN SAYISI: {bekleyen_sayisi}")
                     print("-" * 50)
+                    
+                    if bekleyen_sayisi > 0:
+                        print("⚡ Süzgeç devreye giriyor...")
+                        suzgec.kuyrugu_isle(driver=driver, sure_limiti=25)
+                    else:
+                        print("⚡ Kuyruk boş, süzgeç atlandı. Doğrudan yeni taramaya geçiliyor.")
+                        
                 else:
-                    print("⚠️ Ekranda 'Tarih' referansı bulunamadı!")
-                            
-            except Exception as e:
-                print(f"⚠️ DÖNGÜ HATASI: {e}")
-            
-            # Kuyruktaki ilanları işleme süresi
-            suzgec.kuyrugu_isle(driver=driver, sure_limiti=25)
+                    raise Exception("Ekranda 'Tarih' referansı bulunamadı!")
+                
+                print("⏳ Diğer tura geçmeden önce 2 saniye bekleniyor...")
+                time.sleep(2)
 
-    except Exception as e:
-        print(f"❌ SİSTEM HATASI: {e}")
+            print("\n🧹 5 TUR TAMAMLANDI! RAM'i temizlemek için tarayıcı tamamen kapatılıp yeniden açılacak...")
+            
+        except Exception as e:
+            # Buradaki hata mesajını daha okunaklı yaptık
+            print(f"\n❌ SİSTEMDE BİR TIKANMA/HATA OLDU:\n{e}")
+            print("🔄 Panik yok! Arızalı/Donuk tarayıcı imha edilip yenisi açılacak...")
+            
+        finally:
+            try:
+                driver.quit()
+                print("💀 Eski Chrome tamamen kapatıldı.")
+            except:
+                pass
+            time.sleep(3) 
 
 if __name__ == "__main__":
     kap_radar_avci_modu()
