@@ -6,12 +6,14 @@ from selenium.webdriver.common.action_chains import ActionChains
 from webdriver_manager.chrome import ChromeDriverManager
 import time
 
+# MODÜLLERİMİZİ İÇERİ AKTARIYORUZ
 from suzgec import KapSuzgeci 
+from filtre import KapFiltreci
 
 KAP_ANA_SAYFA = "https://www.kap.org.tr/tr/"
 
 def kap_radar_avci_modu():
-    print("🌐 Chrome başlatılıyor (RADAR BAŞMÜHENDİS MODU)...")
+    print("🌐 Chrome başlatılıyor (TAM OTOMATİK RADAR MODU)...")
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
     options.add_experimental_option("detach", True) 
@@ -23,27 +25,42 @@ def kap_radar_avci_modu():
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
-    suzgec = KapSuzgeci()
+    # Yardımcılarımızı başlatıyoruz
+    suzgec = KapSuzgeci()   # Süzgecin hafızası burada başlar ve asla silinmez!
+    filtreci = KapFiltreci()
+    
+    tur_sayaci = 0 
     
     try:
         driver.get(KAP_ANA_SAYFA)
-        print("\n" + "="*70)
-        print("🚨 KONTROL SENDE!")
-        print("1. Filtrelerini ayarla (BİST, ÖDA vs.)")
-        print("2. Tablo ekrana geldiğinde terminalde ENTER'a bas.")
-        print("="*70 + "\n")
         
-        input("Hazır olduğunda ENTER tuşuna bas...\n")
+        # SİSTEM İLK AÇILDIĞINDA FİLTREYİ KUR
+        filtreci.filtreleri_kur(driver)
         
         js_tarih_bul = """
             let elements = Array.from(document.querySelectorAll('div, th, span'));
             return elements.find(e => e.innerText.trim() === 'Tarih');
         """
         
-        print("✅ Radar aktif! Linkleri bulacak ve boş vaktinde Süzgeç'i çalıştıracak.")
+        print("🚀 Radar aktif! Ava çıkılıyor...")
         
         while True:
             try:
+                tur_sayaci += 1
+                
+                # 🔥 ANTİ-DONMA KORUMASI: 15 Turda bir sayfayı yenile ve filtreyi baştan kur
+                if tur_sayaci >= 15:
+                    print("\n🧹 KAP SİTESİ ŞİŞMESİN DİYE HAFIZA TEMİZLENİYOR (F5)...")
+                    driver.refresh()
+                    time.sleep(5) 
+                    print("🔄 Sayfa yenilendi, filtreler silindi.")
+                    
+                    # Filtreciye haber ver, filtreleri tekrar kursun
+                    filtreci.filtreleri_kur(driver)
+                    
+                    tur_sayaci = 0
+                    continue 
+                
                 zaman = time.strftime('%H:%M:%S')
                 
                 guncel_input = driver.execute_script("""
@@ -56,16 +73,16 @@ def kap_radar_avci_modu():
 
                 if guncel_input:
                     driver.execute_script("arguments[0].scrollIntoView({block: 'center'}); arguments[0].focus(); arguments[0].click();", guncel_input)
-                    time.sleep(0.2)
+                    time.sleep(0.5)
                     ActionChains(driver).send_keys(Keys.TAB).perform()
-                    time.sleep(0.2)
+                    time.sleep(0.5)
                     guncel_buyutec = driver.switch_to.active_element
                     driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", guncel_buyutec)
                     
                     ActionChains(driver).send_keys(Keys.ENTER).perform()
-                    print(f"\n🔄 [{zaman}] Büyütece basıldı. Radar tarıyor...")
+                    print(f"\n🔄 [{zaman}] Büyütece basıldı. Radar tarıyor... (Tur: {tur_sayaci}/15)")
                 
-                time.sleep(4) 
+                time.sleep(5) 
                 
                 tarih_element = driver.execute_script(js_tarih_bul)
                 
@@ -89,20 +106,17 @@ def kap_radar_avci_modu():
                         
                         okunan_link = driver.current_url
                         
-                        # 🔥 1. KORUMA: Sadece geçerli KAP bildirimlerini al (çöp linkleri kuyruğa sokma)
                         if "Bildirim" in okunan_link:
+                            # 🔥 SÜZGEÇ DEVREDE: Aynı link daha önce okunduysa 'False' döner ve reddedilir
                             if suzgec.link_ekle(okunan_link):
-                                print(f"🌟 YENİ İLAN SÜZGEÇTEN GEÇTİ VE KUYRUĞA ALINDI: {okunan_link.split('/')[-1]}")
+                                print(f"🌟 YENİ İLAN KUYRUĞA ALINDI: {okunan_link.split('/')[-1]}")
                             else:
                                 print(f"➖ Eski ilan atlandı: {okunan_link.split('/')[-1]}")
                         
-                        # 🔥 2. KORUMA: Ana sekmeyi yanlışlıkla kapatmayı engelle!
                         if len(driver.window_handles) > 1:
-                            # Birden fazla sekme varsa rahatça kapat ve ana sekmeye dön
                             driver.close()
                             driver.switch_to.window(driver.window_handles[0])
                         elif "Bildirim" in okunan_link:
-                            # Eğer yeni sekme açılamamış ve ilan aynı ekranda açılmışsa filtreler bozulmasın diye geri git
                             driver.back()
                         
                         time.sleep(0.5) 
@@ -115,10 +129,11 @@ def kap_radar_avci_modu():
             except Exception as e:
                 print(f"⚠️ DÖNGÜ HATASI: {e}")
             
-            # Süzgece çalışması için süre tanıyoruz
-            suzgec.kuyrugu_isle(driver=driver, sure_limiti=16)
+            # Kuyruktaki ilanları işleme süresi
+            suzgec.kuyrugu_isle(driver=driver, sure_limiti=25)
 
     except Exception as e:
         print(f"❌ SİSTEM HATASI: {e}")
 
-kap_radar_avci_modu()
+if __name__ == "__main__":
+    kap_radar_avci_modu()
