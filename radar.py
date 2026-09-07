@@ -108,7 +108,7 @@ def kap_radar_avci_modu():
                 if tarih_element:
                     driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", tarih_element)
                     
-                    PIKSELLER = [50, 120, 180] 
+                    PIKSELLER = [50, 120, 185] 
                     
                     for i, piksel in enumerate(PIKSELLER, 1):
                         ActionChains(driver) \
