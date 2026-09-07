@@ -38,12 +38,17 @@ class KonuIsleyici:
             # =================================================================
             # 🔥 3 KELİMELİK FİLTRELEME VE RAPORLAMA ALGORİTMASI 🔥
             # =================================================================
-            aranan_kelimeler = ["sözleşme", "ihale", "yeni iş"] 
-            kucuk_harfli_baslik = okunan_konu_basligi.lower()
+            aranan_kelimeler = ["Özel Durum Açıklaması (Genel)", "İhale Süreci / Sonucu", "Yeni İş İlişkisi"] 
+            
+            # Türkçe İ ve I harflerini hatasız dönüştürüp her şeyi küçük harfe çeviriyoruz
+            kucuk_harfli_baslik = okunan_konu_basligi.replace('İ', 'i').replace('I', 'ı').lower()
             
             eslesen_kelime = None
             for kelime in aranan_kelimeler:
-                if kelime in kucuk_harfli_baslik:
+                # Aradığımız kelimeleri de aynı şekilde küçük harfe çeviriyoruz ki EŞLEŞSİN!
+                aranan_kucuk = kelime.replace('İ', 'i').replace('I', 'ı').lower()
+                
+                if aranan_kucuk in kucuk_harfli_baslik:
                     eslesen_kelime = kelime
                     break 
             
@@ -52,10 +57,13 @@ class KonuIsleyici:
                 print(f"🟢 BULUNAN CÜMLE : '{okunan_konu_basligi}'")
                 print(f"🎯 DURUM         : ARANAN KELİME İÇERİYOR ---> ({eslesen_kelime.upper()})")
                 print("✅ Eşleşme başarılı! (Sekme planlandığı gibi kapatılacak)")
+                # DİKKAT: Burada 'return True' eklemezsek Radar.py bu ilan işimize yaradı mı yaramadı mı bilemez!
+                # return True (İstersen buraya ekleyebilirsin, mevcut mimarine göre)
             else:
                 print(f"🔴 BULUNAN CÜMLE : '{okunan_konu_basligi}'")
                 print(f"🗑️ DURUM         : ARANMAYAN KELİME (ÇÖP)")
                 print("❌ Eşleşme yok! (Sekme planlandığı gibi kapatılacak)")
+                # return False (İstersen buraya ekleyebilirsin)
             print("="*80 + "\n")
             # =================================================================
 
