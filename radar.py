@@ -8,14 +8,17 @@ import time
 
 from suzgec import KapSuzgeci 
 from filtre import KapFiltreci
+# 🔥 YENİ SİLAHIMIZI İÇERİ AKTARIYORUZ
+from tiklama import KapTiklayici 
 
 KAP_ANA_SAYFA = "https://www.kap.org.tr/tr/"
 
 def kap_radar_avci_modu():
-    print("🛡️ ZIRHLI VE TURBO RADAR SİSTEMİ BAŞLATILIYOR (Hafifletilmiş Dedektör)...")
+    print("🛡️ ZIRHLI VE TURBO RADAR SİSTEMİ BAŞLATILIYOR (Kamuflajlı & Lazerli)...")
     
     suzgec = KapSuzgeci()   
     filtreci = KapFiltreci()
+    tiklayici = KapTiklayici() # 🔥 Lazerli tıklayıcımızı (Keskin Nişancı) hazırladık
     
     genel_tur_sayaci = 0 
     
@@ -29,10 +32,24 @@ def kap_radar_avci_modu():
         options.add_argument("--disable-background-timer-throttling")
         options.add_argument("--disable-backgrounding-occluded-windows")
         options.add_argument("--disable-renderer-backgrounding")
+        
+        # --- 🥷 PATRONUN KAMUFLAJ (STEALTH) AYARLARI ---
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        options.add_experimental_option('useAutomationExtension', False)
+        options.add_argument("--disable-blink-features=AutomationControlled")
 
         try:
             driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
             driver.set_page_load_timeout(45) 
+            
+            # --- 🥷 PATRONUN KİMLİK GİZLEME SİSTEMİ ---
+            driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+                'source': '''
+                    Object.defineProperty(navigator, 'webdriver', {
+                      get: () => undefined
+                    })
+                '''
+            })
             
             driver.get(KAP_ANA_SAYFA)
             
@@ -51,6 +68,7 @@ def kap_radar_avci_modu():
                 genel_tur_sayaci += 1
                 zaman = time.strftime('%H:%M:%S')
                 
+                # ARAMA VE BÜYÜTEÇ BUTONUNA BASMA İŞLEMİ
                 guncel_input = driver.execute_script("""
                     let allInputs = Array.from(document.querySelectorAll('input'));
                     return allInputs.find(inp => {
@@ -72,15 +90,12 @@ def kap_radar_avci_modu():
                 else:
                     raise Exception("Arama butonu (Input) bulunamadı! Sayfa eksik yüklenmiş.")
                 
-                # ==============================================================================
-                # 🔥 YENİ SİSTEM: HAFİFLETİLMİŞ AKILLI SPINNER DEDEKTÖRÜ (CHROME'U PATLATMAZ)
-                # ==============================================================================
                 time.sleep(1.5) 
                 
+                # --- 🛑 PATRONUN SPINNER (DONUK SAYFA) DEDEKTÖRÜ ---
                 bekleme_sayaci = 0
                 while bekleme_sayaci < 12: 
                     spinner_var_mi = driver.execute_script("""
-                        // Bütün DOM'u taramak yerine sadece class isminde loading/spinner geçenleri bul (ÇOK HIZLI)
                         let spinners = document.querySelectorAll('[class*="loading" i], [class*="spinner" i], [class*="blockui" i]');
                         for(let i=0; i<spinners.length; i++) {
                             let style = window.getComputedStyle(spinners[i]);
@@ -101,50 +116,26 @@ def kap_radar_avci_modu():
                     raise Exception("Sonsuz dönen ikon tespit edildi! KAP Tablosu askıda kaldı.")
                 
                 time.sleep(1.5) 
-                # ==============================================================================
                 
+                # HEDEFİ (TARİH) BUL VE LAZERLİ NİŞANCIYI ÇAĞIR
                 tarih_element = driver.execute_script(js_tarih_bul)
                 
                 if tarih_element:
                     driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", tarih_element)
                     
-                    PIKSELLER = [50, 120, 185] 
+                    # ==============================================================================
+                    # 🔥 İŞTE BÜYÜK TEMİZLİK BURASI: Tıklama işini tek satırda modüle devrettik!
+                    # ==============================================================================
+                    tiklayici.lazerli_tikla_ve_topla(driver, tarih_element, suzgec)
+                    # ==============================================================================
                     
-                    for i, piksel in enumerate(PIKSELLER, 1):
-                        ActionChains(driver) \
-                            .move_to_element(tarih_element) \
-                            .move_by_offset(0, piksel) \
-                            .key_down(Keys.CONTROL) \
-                            .click() \
-                            .key_up(Keys.CONTROL) \
-                            .perform()
-                        
-                        time.sleep(0.5) 
-                        driver.switch_to.window(driver.window_handles[-1])
-                        time.sleep(0.5) 
-                        
-                        okunan_link = driver.current_url
-                        
-                        if "Bildirim" in okunan_link:
-                            if suzgec.link_ekle(okunan_link):
-                                print(f"🌟 YENİ İLAN KUYRUĞA ALINDI: {okunan_link.split('/')[-1]}")
-                            else:
-                                print(f"➖ Eski ilan atlandı: {okunan_link.split('/')[-1]}")
-                        
-                        if len(driver.window_handles) > 1:
-                            driver.close()
-                            driver.switch_to.window(driver.window_handles[0])
-                        elif "Bildirim" in okunan_link:
-                            driver.back()
-                        
-                        time.sleep(0.5) 
-                        
+                    # Tıklama bittikten sonra süzgeçteki kuyruğa bakıyoruz
                     bekleyen_sayisi = suzgec.kuyruk_durumu()
                     print(f"📦 KUYRUKTAKİ BEKLEYEN İLAN SAYISI: {bekleyen_sayisi}")
                     print("-" * 50)
                     
                     if bekleyen_sayisi > 0:
-                        print("⚡ Süzgeç devreye giriyor...")
+                        print("⚡ Süzgeç devreye giriyor (Hedefler router'a paslanıyor)...")
                         suzgec.kuyrugu_isle(driver=driver, sure_limiti=25)
                     else:
                         print("⚡ Kuyruk boş, süzgeç atlandı. Doğrudan yeni taramaya geçiliyor.")
@@ -158,7 +149,7 @@ def kap_radar_avci_modu():
             print("\n🧹 5 TUR TAMAMLANDI! RAM'i temizlemek için tarayıcı tamamen kapatılıp yeniden açılacak...")
             
         except Exception as e:
-            # Buradaki hata mesajını daha okunaklı yaptık
+            # --- 🛡️ PATRONUN ÇÖKME KURTARMA SİSTEMİ ---
             print(f"\n❌ SİSTEMDE BİR TIKANMA/HATA OLDU:\n{e}")
             print("🔄 Panik yok! Arızalı/Donuk tarayıcı imha edilip yenisi açılacak...")
             
