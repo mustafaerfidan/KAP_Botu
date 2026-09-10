@@ -4,16 +4,15 @@ from selenium.webdriver.common.action_chains import ActionChains
 
 class KapTiklayici:
     def __init__(self):
-        # 🎯 HEDEF AYARLARI
+        # 🎯 HEDEF AYARLARI (Senin kalibre ettiğin kusursuz pikseller)
         self.X_KAYMA = 130 
-        self.Y_PIKSELLER = [50, 110, 175]
+        self.Y_PIKSELLER = [110, 170, 250]
 
     def lazerli_tikla_ve_topla(self, driver, tarih_element, suzgec):
-        print("\n🔵 [TIKLAMA.PY] Lazerli tıklama sistemi devreye girdi!")
+        print("\n🔵 [TIKLAMA.PY] Lazerli vur-kaç sistemi devreye girdi!")
         
         for i, piksel in enumerate(self.Y_PIKSELLER, 1):
             
-            # Eski sekme sayısını hafızaya alıyoruz ki yeni sekme açıldı mı anlayabilelim
             eski_sekme_sayisi = len(driver.window_handles)
             
             # ====================================================================
@@ -34,10 +33,7 @@ class KapTiklayici:
                 dot.style.borderRadius = '50%';
                 dot.style.zIndex = '999999';
                 dot.style.boxShadow = '0 0 15px 5px cyan'; 
-                
-                // 🔥 İŞTE SİHİRLİ KOD: Tıklamalar bu noktanın içinden geçip alta ulaşacak!
                 dot.style.pointerEvents = 'none'; 
-                
                 document.body.appendChild(dot);
                 
                 setTimeout(() => dot.remove(), 1500);
@@ -56,30 +52,40 @@ class KapTiklayici:
                 .key_up(Keys.CONTROL) \
                 .perform()
             
-            time.sleep(1) # Tıkladıktan sonra sekmenin açılması için bekliyoruz
+            time.sleep(0.5) 
             
             # ====================================================================
-            # 3. AŞAMA: YENİ SEKME KONTROLÜ VE SÜZGEÇ İŞLEMİ
+            # 3. AŞAMA: İÇERİĞİ BOŞVER, SADECE LİNKİ AL VE SEKMEYİ ZORLA KAPAT!
             # ====================================================================
             if len(driver.window_handles) > eski_sekme_sayisi:
-                # Yeni sekme başarıyla açıldı! O sekmeye geç.
-                driver.switch_to.window(driver.window_handles[-1])
-                time.sleep(0.5) 
+                try:
+                    driver.switch_to.window(driver.window_handles[-1])
+                    
+                    # 🔥 VUR-KAÇ TAKTİĞİ: Sayfanın içeriği yüklenmeden ZORLA DURDUR!
+                    try:
+                        driver.execute_script("window.stop();")
+                    except:
+                        pass
+                    
+                    # Sayfa durduruldu ama adres çubuğundaki link elimizde!
+                    okunan_link = driver.current_url
+                    
+                    if "Bildirim" in okunan_link:
+                        if suzgec.link_ekle(okunan_link):
+                            print(f"🌟 YENİ İLAN KUYRUĞA ALINDI: {okunan_link.split('/')[-1]}")
+                        else:
+                            print(f"➖ Eski ilan atlandı: {okunan_link.split('/')[-1]}")
                 
-                okunan_link = driver.current_url
+                except Exception as e:
+                    print(f"⚠️ [TIKLAMA.PY] Link okunurken pürüz çıktı: {e}")
                 
-                if "Bildirim" in okunan_link:
-                    if suzgec.link_ekle(okunan_link):
-                        print(f"🌟 YENİ İLAN KUYRUĞA ALINDI: {okunan_link.split('/')[-1]}")
-                    else:
-                        print(f"➖ Eski ilan atlandı: {okunan_link.split('/')[-1]}")
-                
-                # İşi biten sekmeyi temizle ve ana radara dön
-                driver.close()
-                driver.switch_to.window(driver.window_handles[0])
+                finally:
+                    # Ne olursa olsun o sekmeyi anında kapat ve geri dön!
+                    if len(driver.window_handles) > 1:
+                        driver.close()
+                        driver.switch_to.window(driver.window_handles[0])
             else:
-                # Eğer sekme açılmazsa bizi uyaracak
-                print(f"⚠️ X:{self.X_KAYMA} Y:{piksel} noktasına tıklandı ama yeni sekme AÇILMADI! (Lazer boşa düşmüş olabilir)")
+                print(f"⚠️ X:{self.X_KAYMA} Y:{piksel} noktasına tıklandı ama yeni sekme AÇILMADI!")
             
             time.sleep(0.5) 
 
@@ -96,6 +102,8 @@ if __name__ == "__main__":
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
     options.add_experimental_option("detach", True) 
+    # Sayfa yüklenmesini beklemeden işleme geçmek için eager modu ekledik
+    options.page_load_strategy = 'eager' 
     
     test_driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
