@@ -4,130 +4,168 @@ from selenium.webdriver.common.action_chains import ActionChains
 
 class KapTiklayici:
     def __init__(self):
-        # 🎯 HEDEF AYARLARI (Senin kalibre ettiğin kusursuz pikseller)
-        self.X_KAYMA = 130 
-        self.Y_PIKSELLER = [110, 170, 250]
+        pass
 
-    def lazerli_tikla_ve_topla(self, driver, tarih_element, suzgec):
-        print("\n🔵 [TIKLAMA.PY] Lazerli vur-kaç sistemi devreye girdi!")
+    def lazerli_tikla_ve_topla(self, driver, suzgec=None):
+        print("\n👻 [TIKLAMA.PY] KUTU KIRICI MOD: KAP'ın gizli satırlarına (div) sızılıyor...")
         
-        for i, piksel in enumerate(self.Y_PIKSELLER, 1):
-            
-            eski_sekme_sayisi = len(driver.window_handles)
-            
+        try:
             # ====================================================================
-            # 1. AŞAMA: HAYALET MAVİ LAZER EFEKTİNİ ÇİZ 
+            # 1. AŞAMA: TABLONUN YÜKLENMESİNİ BEKLE
             # ====================================================================
-            driver.execute_script(f"""
-                let rect = arguments[0].getBoundingClientRect();
-                let x = rect.left + (rect.width / 2) + {self.X_KAYMA};
-                let y = rect.top + (rect.height / 2) + {piksel};
+            print("⏳ Tablonun indirilmesi bekleniyor...")
+            bekleme_sayaci = 0
+            while bekleme_sayaci < 12:
+                spinner_var_mi = driver.execute_script("""
+                    let spinners = document.querySelectorAll('[class*="loading" i], [class*="spinner" i], [class*="blockui" i]');
+                    for(let i=0; i<spinners.length; i++) {
+                        let style = window.getComputedStyle(spinners[i]);
+                        if(style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                            return true;
+                        }
+                    }
+                    return false;
+                """)
+                if not spinner_var_mi:
+                    break
+                time.sleep(1)
+                bekleme_sayaci += 1
                 
-                let dot = document.createElement('div');
-                dot.style.position = 'fixed';
-                dot.style.left = (x - 7) + 'px'; 
-                dot.style.top = (y - 7) + 'px';
-                dot.style.width = '15px';
-                dot.style.height = '15px';
-                dot.style.backgroundColor = 'blue';
-                dot.style.borderRadius = '50%';
-                dot.style.zIndex = '999999';
-                dot.style.boxShadow = '0 0 15px 5px cyan'; 
-                dot.style.pointerEvents = 'none'; 
-                document.body.appendChild(dot);
+            time.sleep(2) 
+            
+            # ====================================================================
+            # 2. AŞAMA: SİHİRLİ JS İLE SATIR (KUTU) ELEMENTLERİNİ BUL
+            # ====================================================================
+            js_kutulari_bul = """
+                // 1. Tarih başlığını bul
+                let elemanlar = Array.from(document.querySelectorAll('div, span, th'));
+                let tarih = elemanlar.find(e => e.innerText.trim() === 'Tarih');
+                if (!tarih) return [];
                 
-                setTimeout(() => dot.remove(), 1500);
-            """, tarih_element)
+                // 2. Asıl tablonun çerçevesini bul
+                let tablo = tarih.parentElement;
+                while (tablo && tablo.innerText.length < 200) {
+                    tablo = tablo.parentElement;
+                }
+                
+                // 3. Tablonun içindeki gerçek ilan satırlarını yakala
+                let satirlar = Array.from(tablo.querySelectorAll('.list-group-item, .w-table-row, div[role="row"]'));
+                
+                // Eğer sınıfları (class) değiştirmişlerse "Bugün" veya "Saat" formatı olan kutuları bul
+                if (satirlar.length === 0) {
+                    let regex = /Bugün|\\d{2}:\\d{2}/;
+                    satirlar = Array.from(tablo.children).filter(child => regex.test(child.innerText) && !child.innerText.includes('Tarih'));
+                }
+                
+                // İlk 3 satırı (DOM elementi olarak) geri gönder
+                return satirlar.slice(0, 3);
+            """
             
-            time.sleep(0.5) 
+            # Bot HTML kutularını fiziksel nesne (WebElement) olarak alıyor!
+            bulunan_kutular = driver.execute_script(js_kutulari_bul)
             
-            # ====================================================================
-            # 2. AŞAMA: LAZERİN OLDUĞU YERE CTRL+TIKLA YAP
-            # ====================================================================
-            ActionChains(driver) \
-                .move_to_element(tarih_element) \
-                .move_by_offset(self.X_KAYMA, piksel) \
-                .key_down(Keys.CONTROL) \
-                .click() \
-                .key_up(Keys.CONTROL) \
-                .perform()
-            
-            time.sleep(0.5) 
-            
-            # ====================================================================
-            # 3. AŞAMA: İÇERİĞİ BOŞVER, SADECE LİNKİ AL VE SEKMEYİ ZORLA KAPAT!
-            # ====================================================================
-            if len(driver.window_handles) > eski_sekme_sayisi:
-                try:
-                    driver.switch_to.window(driver.window_handles[-1])
+            if bulunan_kutular and len(bulunan_kutular) > 0:
+                print(f"\n🎯 Ekranda {len(bulunan_kutular)} adet gizli ilan kutusu bulundu! Operasyon başlıyor...")
+                print("="*90)
+                
+                for i, kutu in enumerate(bulunan_kutular, 1):
+                    eski_sekme_sayisi = len(driver.window_handles)
                     
-                    # 🔥 VUR-KAÇ TAKTİĞİ: Sayfanın içeriği yüklenmeden ZORLA DURDUR!
-                    try:
-                        driver.execute_script("window.stop();")
-                    except:
-                        pass
+                    # Kutunun içindeki yazıyı (Şirket adını vs.) görelim
+                    kutu_yazisi = kutu.text.replace('\n', ' ')[:45]
+                    print(f"[{i}] VURULAN KUTU: {kutu_yazisi}...")
                     
-                    # Sayfa durduruldu ama adres çubuğundaki link elimizde!
-                    okunan_link = driver.current_url
+                    # ================================================================
+                    # FİZİKSEL VURUŞ: Fareyle direkt o kutunun kalbine CTRL+TIKLA!
+                    # ================================================================
+                    ActionChains(driver) \
+                        .move_to_element(kutu) \
+                        .key_down(Keys.CONTROL) \
+                        .click() \
+                        .key_up(Keys.CONTROL) \
+                        .perform()
+                        
+                    time.sleep(1.5) # Sekmenin açılmasını bekle
                     
-                    if "Bildirim" in okunan_link:
-                        if suzgec.link_ekle(okunan_link):
-                            print(f"🌟 YENİ İLAN KUYRUĞA ALINDI: {okunan_link.split('/')[-1]}")
-                        else:
-                            print(f"➖ Eski ilan atlandı: {okunan_link.split('/')[-1]}")
-                
-                except Exception as e:
-                    print(f"⚠️ [TIKLAMA.PY] Link okunurken pürüz çıktı: {e}")
-                
-                finally:
-                    # Ne olursa olsun o sekmeyi anında kapat ve geri dön!
-                    if len(driver.window_handles) > 1:
+                    # Yeni sekme açıldıysa:
+                    if len(driver.window_handles) > eski_sekme_sayisi:
+                        driver.switch_to.window(driver.window_handles[-1])
+                        
+                        try:
+                            driver.execute_script("window.stop();") # Vur-Kaç!
+                        except:
+                            pass
+                            
+                        okunan_link = driver.current_url
+                        print(f"    🔗 YAKALANAN GİZLİ LİNK: {okunan_link.split('/')[-1]}")
+                        
+                        if suzgec:
+                            suzgec.link_ekle(okunan_link)
+                            
+                        # Sekmeyi kapat ve ana radara dön
                         driver.close()
                         driver.switch_to.window(driver.window_handles[0])
+                    
+                    # Bazen KAP kendi içinde aynı sekmeyi günceller (CTRL basmamıza rağmen)
+                    elif driver.current_url != "https://www.kap.org.tr/tr/":
+                        try:
+                            driver.execute_script("window.stop();")
+                        except:
+                            pass
+                        okunan_link = driver.current_url
+                        print(f"    🔗 AYNI SEKMEYE AÇILDI, LİNK ALINDI: {okunan_link.split('/')[-1]}")
+                        if suzgec:
+                            suzgec.link_ekle(okunan_link)
+                        driver.back() # Anasayfaya geri dön
+                        time.sleep(1)
+                        
+                    else:
+                        print("    ⚠️ Kutuya tıklandı ama tepki vermedi! KAP engeli olabilir.")
+                    
+                    time.sleep(0.5)
+                print("="*90)
+                
             else:
-                print(f"⚠️ X:{self.X_KAYMA} Y:{piksel} noktasına tıklandı ama yeni sekme AÇILMADI!")
-            
-            time.sleep(0.5) 
+                print("⚠️ Ekranda tıklanacak ilan kutusu (satır) bulunamadı!")
+                
+        except Exception as e:
+            print(f"❌ [TIKLAMA.PY] Operasyon sırasında hata: {e}")
 
 # =====================================================================
-# 🧪 SADECE TIKLAMA.PY'Yİ TEK BAŞINA TEST ETMEK İÇİN
+# 🧪 TIKLAMA.PY TEST MODU (Zırhlı Versiyon)
 # =====================================================================
 if __name__ == "__main__":
     from selenium import webdriver
     from selenium.webdriver.chrome.service import Service
     from webdriver_manager.chrome import ChromeDriverManager
     
-    print("🧪 TIKLAMA.PY TEST MODU AKTİF: Tarayıcı açılıyor...")
+    print("🧪 TIKLAMA.PY TEST MODU AKTİF: Zırhlar giyiliyor, tarayıcı açılıyor...")
     
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
     options.add_experimental_option("detach", True) 
-    # Sayfa yüklenmesini beklemeden işleme geçmek için eager modu ekledik
-    options.page_load_strategy = 'eager' 
+    
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
+    options.add_argument("--disable-blink-features=AutomationControlled")
     
     test_driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     
+    test_driver.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
+        'source': '''
+            Object.defineProperty(navigator, 'webdriver', {
+              get: () => undefined
+            })
+        '''
+    })
+    
     test_driver.get("https://www.kap.org.tr/tr/")
-    print("⏳ KAP açıldı, tablonun yüklenmesi için 5 saniye bekleniyor...")
-    time.sleep(5)
     
-    js_tarih_bul = """
-        let elements = Array.from(document.querySelectorAll('div, th, span'));
-        return elements.find(e => e.innerText.trim() === 'Tarih');
-    """
-    hedef_tarih_elementi = test_driver.execute_script(js_tarih_bul)
+    class SahteSuzgec:
+        def link_ekle(self, link): return True
+        def kuyruk_durumu(self): return 1
+        
+    tiklayici = KapTiklayici()
+    tiklayici.lazerli_tikla_ve_topla(test_driver, SahteSuzgec())
     
-    if hedef_tarih_elementi:
-        test_driver.execute_script("arguments[0].style.outline = '4px solid #00ff00';", hedef_tarih_elementi)
-        print("✅ Tarih referansı bulundu! Lazer ateşleniyor...")
-        
-        class SahteSuzgec:
-            def link_ekle(self, link): return True
-            def kuyruk_durumu(self): return 1
-            
-        tiklayici = KapTiklayici()
-        tiklayici.lazerli_tikla_ve_topla(test_driver, hedef_tarih_elementi, SahteSuzgec())
-        
-        print("\n🎯 Test Bitti!")
-    else:
-        print("❌ 'Tarih' referansı bulunamadı.")
+    print("\n✅ Test Bitti!")
